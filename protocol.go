@@ -48,6 +48,44 @@ const (
 
 var errNoTimeout = errors.New("no timeout")
 
+// ProtocolFromRequest returns the protocol name for an HTTP request. It
+// inspects the request's method and headers to determine the protocol. If the
+// request doesn't match any known protocol, an empty string is returned.
+func ProtocolFromRequest(request *http.Request) string {
+	switch classifyRequest(request, false) {
+	case connectUnaryProtocol, connectStreamProtocol:
+		return ProtocolConnect
+	case grpcProtocol:
+		return ProtocolGRPC
+	case grpcWebProtocol:
+		return ProtocolGRPCWeb
+	case unknownProtocol:
+		return ""
+	default:
+		return ""
+	}
+}
+
+// ProcedureFromURL returns the procedure name for a URL. It's returned in the
+// form "/service/method". If the path doesn't contain a service and method, the
+// entire path is returned.
+func ProcedureFromURL(url *url.URL) string {
+	path := strings.TrimSuffix(url.Path, "/")
+	ultimate := strings.LastIndex(path, "/")
+	if ultimate < 0 {
+		return url.Path
+	}
+	penultimate := strings.LastIndex(path[:ultimate], "/")
+	if penultimate < 0 {
+		return url.Path
+	}
+	procedure := path[penultimate:]
+	if len(procedure) < 4 { // two slashes + service + method
+		return url.Path
+	}
+	return procedure
+}
+
 // A Protocol defines the HTTP semantics to use when sending and receiving
 // messages. It ties together codecs, compressors, and net/http to produce
 // Senders and Receivers.
